@@ -1,31 +1,22 @@
 import { decode } from "@googlemaps/polyline-codec"
 import { createFileRoute } from "@tanstack/react-router"
-import { LngLatBounds, type PaddingOptions } from "maplibre-gl"
-import { useLayoutEffect, useMemo, useRef } from "react"
-import { MapRoute, useMap } from "@/components/ui/map"
+import { useMemo } from "react"
+import { MapRoute } from "@/components/ui/map"
 import TripDetails from "@/features/trips/trip-details"
 import VehiclesLayer from "@/features/vehicles/vehicles"
 import { $api } from "@/lib/client"
 import { FUTAR_API_VERSION } from "@/lib/constants"
 import StopsLayer from "@/features/stops/stops"
 import { vehicleFromTripResponse } from "@/lib/utils"
-import { useIsMobile } from "@/hooks/use-mobile"
 import type { TripDetailsResponse } from "@/lib/types"
+import useFitBounds from "@/hooks/use-fit-bounds"
 
 export const Route = createFileRoute("/trip/$id/$date")({
     component: RouteComponent,
 })
 
-const MAP_BOUNDS_SMALL_PADDING = 100
-const MAP_BOUNDS_LARGE_PADDING = 500
-
 function RouteComponent() {
     const { id, date } = Route.useParams()
-
-    const { map } = useMap()
-
-    const isMobile = useIsMobile()
-    const animated = useRef(false)
 
     const queryResult = $api.useQuery(
         "get",
@@ -65,36 +56,13 @@ function RouteComponent() {
         return decoded
     }, [data])
 
-    const vehicle = useMemo(
-        () => data && vehicleFromTripResponse(data),
-        [data]
-    )
+    useFitBounds({ path })
+
+    const vehicle = useMemo(() => data && vehicleFromTripResponse(data), [data])
 
     const stopIds = useMemo(() => {
         return data && data.entry.stopTimes.map((st) => st.stopId)
     }, [data])
-
-    useLayoutEffect(() => {
-        if (!map || path.length === 0 || animated.current) return
-
-        const bounds = path.reduce(
-            (bnds, coord) => {
-                return bnds.extend(coord)
-            },
-            new LngLatBounds(path[0], path[0])
-        )
-
-        const padding: PaddingOptions = {
-            top: MAP_BOUNDS_SMALL_PADDING,
-            bottom: isMobile ? MAP_BOUNDS_LARGE_PADDING : MAP_BOUNDS_SMALL_PADDING,
-            left: isMobile ? MAP_BOUNDS_SMALL_PADDING : MAP_BOUNDS_LARGE_PADDING,
-            right: MAP_BOUNDS_SMALL_PADDING,
-        }
-
-        map.fitBounds(bounds, { padding, maxZoom: 14 })
-
-        animated.current = true
-    }, [map, path, isMobile])
 
     return (
         <>
